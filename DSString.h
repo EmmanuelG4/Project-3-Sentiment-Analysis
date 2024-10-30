@@ -2,6 +2,7 @@
 #define DSSTRING_H
 
 #include <iostream>
+#include <cstring>
 
 class DSString{
     private:
@@ -10,9 +11,17 @@ class DSString{
         size_t len;
 
     public:
-        DSString();
+        DSString(){
+            data = nullptr;
+            len = 0;
+        }
 
-        DSString(const DSString &);
+        DSString(const char *);
+
+        DSString(const DSString &other) : len(other.len) {
+            data = new char[len + 1];
+            std::strcpy(data, other.data);
+        }
 
         DSString &operator=(const DSString &);
 
@@ -24,9 +33,9 @@ class DSString{
 
         DSString operator+(const DSString &) const;
 
-        DSString operator==(const DSString &) const;
+        bool operator==(const DSString &) const;
 
-        DSString operator<(const DSString &) const;
+        bool operator<(const DSString &) const;
 
         DSString substring(size_t start, size_t numChars) const;
 
