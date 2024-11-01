@@ -11,6 +11,8 @@ class DSString{
         size_t len;
 
     public:
+        static const size_t npos = -1;
+
         DSString(){
             data = nullptr;
             len = 0;
