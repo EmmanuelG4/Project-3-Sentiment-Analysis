@@ -38,7 +38,29 @@ vector<DSString> tokenize(const DSString& text){
 }
 
 void trainClassifier(const string& filename, map<DSString, SentimentWordCount>& wordSentiments){
+    ifstream file(filename);
+    if(!file.is_open()){
+        cerr << "Error. Could not open " << filename << endl;
+        return;
+    }
 
+    string line;
+    while (getline(file, line)) {
+        DSString dsLine = line.c_str();
+        auto tweetData = parseCSVLine(dsLine);
+        int sentiment = stoi(tweetData[0].c_str());
+        DSString tweetText = tweetData[5];
+
+        for (auto& word : tokenize(tweetText)) {
+            if (sentiment == 4) {
+                wordSentiments[word].positiveCount++;
+            } 
+            else if (sentiment == 0) {
+                wordSentiments[word].negativeCount++;
+            }
+        }
+    }
+    file.close();
 }
 
 int classifyTweet(const DSString& tweet, const map<DSString, SentimentWordCount>& wordSentiments){
