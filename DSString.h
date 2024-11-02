@@ -4,8 +4,6 @@
 #include <iostream>
 #include <cstring>
 
-// This file is edited
-
 class DSString{
     private:
         char *data;
