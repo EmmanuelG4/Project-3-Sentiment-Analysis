@@ -32,6 +32,38 @@ DSString::~DSString(){
     delete[] data;
 }
 
+DSString DSString::trim() const {
+    size_t first = find_first_not_of(' ');
+    if (first == npos) {
+        return "";  
+    }
+    size_t last = find_last_not_of(' ');
+    return substring(first, last - first + 1);
+}
+
+size_t DSString::find_first_not_of(char c) const {
+    for (size_t i = 0; i < length(); ++i) {
+        if (c_str()[i] != c) {
+            return i;
+        }
+    }
+    return npos;
+}
+
+size_t DSString::find_last_not_of(char c) const {
+    for (size_t i = length(); i > 0; --i) {
+        if (c_str()[i - 1] != c) {
+            return i - 1;
+        }
+    }
+    return npos;
+}
+
+
+bool DSString::empty() const {
+    return length() == 0;
+}
+
 size_t DSString::length() const{
     return len;
 }
