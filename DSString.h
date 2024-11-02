@@ -4,6 +4,8 @@
 #include <iostream>
 #include <cstring>
 
+// This file is edited
+
 class DSString{
     private:
         char *data;
@@ -28,6 +30,14 @@ class DSString{
         DSString &operator=(const DSString &);
 
         ~DSString();
+
+        bool empty() const;  
+
+        DSString trim() const;
+
+        size_t find_first_not_of(char c) const; 
+
+        size_t find_last_not_of(char c) const;
 
         size_t length() const;
 
