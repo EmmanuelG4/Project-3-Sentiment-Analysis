@@ -47,8 +47,9 @@ int main(int argc, char* argv[]) {
             DSString tweetID = DSString(row[0].get<string>().c_str()).trim();
             DSString tweetText = DSString(row[4].get<string>().c_str()).trim();
             int prediction = classifyTweet(tweetText, wordSentiments);
-            resultsStream << prediction << ", " << tweetID << ", " << tweetText << endl;
-        } catch (const exception& e) {
+            resultsStream << prediction << ", " << tweetID << endl;
+        } 
+        catch (const exception& e) {
             cerr << "Error processing test line " << lineCount << ": " << e.what() << endl;
         }
     }
@@ -59,4 +60,3 @@ int main(int argc, char* argv[]) {
 
     return 0;
 }
-
