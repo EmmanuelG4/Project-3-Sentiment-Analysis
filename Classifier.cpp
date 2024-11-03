@@ -109,9 +109,8 @@ int classifyTweet(const DSString& tweet, const map<DSString, SentimentWordCount>
 float calculateAccuracy(const string& resultsFileName, const string& groundTruthFilename, const string& accuracyFilename) {
     ifstream resultsFile(resultsFileName);
     ifstream groundTruthFile(groundTruthFilename);
-    ofstream accuracyFile(accuracyFilename);
 
-    if (!resultsFile.is_open() || !groundTruthFile.is_open() || !accuracyFile.is_open()) {
+    if (!resultsFile.is_open() || !groundTruthFile.is_open()) {
         cerr << "Error. Could not open at least one of the files." << endl;
         return 0.0f;
     }
@@ -132,40 +131,85 @@ float calculateAccuracy(const string& resultsFileName, const string& groundTruth
 
         auto resultData = parseCSVLine(dsResultsLine);
         auto truthData = parseCSVLine(dsGroundTruthLine);
-        
-        if (resultData.size() < 3 || truthData.size() < 2) {
+
+        if (resultData.size() < 2 || truthData.size() < 1) {
             skippedLines++;
             continue;
         }
 
         try {
-            if (!resultData[0].empty() && !truthData[0].empty() && 
-                isdigit(resultData[0][0]) && isdigit(truthData[0][0])) {
-                
-                int predictedSentiment = stoi(resultData[0].c_str());
-                int actualSentiment = stoi(truthData[0].c_str());
+            int predictedSentiment = stoi(resultData[0].c_str());
+            int actualSentiment = stoi(truthData[0].c_str());
 
-                if (predictedSentiment == actualSentiment) {
-                    correctPredictions++;
-                } else {
-                    accuracyFile << predictedSentiment << ", " << actualSentiment 
-                                 << ", " << resultData[1] << endl;
-                }
-                totalTweets++;
-            } else {
-                skippedLines++;
+            if (predictedSentiment == actualSentiment) {
+                correctPredictions++;
             }
-        } catch (const invalid_argument& e) {
+            totalTweets++;
+        } 
+        catch (const invalid_argument& e) {
             cerr << "Error: Invalid argument in line. Error: " << e.what() << endl;
             skippedLines++;
-        } catch (const out_of_range& e) {
+        } 
+        catch (const out_of_range& e) {
             cerr << "Error: Out of range in line. Error: " << e.what() << endl;
             skippedLines++;
         }
     }
 
     float accuracy = (static_cast<float>(correctPredictions) / totalTweets) * 100;
+
+    ofstream accuracyFile(accuracyFilename, ios::trunc);  
+    if (!accuracyFile.is_open()) {
+        cerr << "Error. Could not open accuracy file for writing." << endl;
+        return accuracy;
+    }
     accuracyFile << "Accuracy: " << fixed << setprecision(2) << accuracy << "%\n";
+    accuracyFile.close();
+
+    accuracyFile.open(accuracyFilename, ios::app);  
+    if (!accuracyFile.is_open()) {
+        cerr << "Error. Could not open accuracy file for appending." << endl;
+        return accuracy;
+    }
+
+    resultsFile.clear();
+    resultsFile.seekg(0);
+    groundTruthFile.clear();
+    groundTruthFile.seekg(0);
+    isFirstLine = true;
+
+    while (getline(resultsFile, resultsLine) && getline(groundTruthFile, groundTruthLine)) {
+        if (isFirstLine) {
+            isFirstLine = false;
+            continue;
+        }
+
+        DSString dsResultsLine = resultsLine.c_str();
+        DSString dsGroundTruthLine = groundTruthLine.c_str();
+
+        auto resultData = parseCSVLine(dsResultsLine);
+        auto truthData = parseCSVLine(dsGroundTruthLine);
+
+        if (resultData.size() < 2 || truthData.size() < 1) {
+            continue;
+        }
+
+        try {
+            int predictedSentiment = stoi(resultData[0].c_str());
+            int actualSentiment = stoi(truthData[0].c_str());
+
+            if (predictedSentiment != actualSentiment) {
+                accuracyFile << predictedSentiment << ", " << actualSentiment
+                             << ", " << resultData[1] << endl;
+            }
+        } 
+        catch (const invalid_argument& e) {
+            continue;
+        } 
+        catch (const out_of_range& e) {
+            continue;
+        }
+    }
 
     if (skippedLines > 0) {
         cerr << "Skipped " << skippedLines << " lines due to format issues." << endl;
