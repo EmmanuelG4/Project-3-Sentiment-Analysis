@@ -120,7 +120,6 @@ float calculateAccuracy(const string& resultsFileName, const string& groundTruth
     int totalTweets = 0, correctPredictions = 0;
     int skippedLines = 0;
     bool isFirstLine = true;
-    int debugLinesToPrint = 5;  
 
     while (getline(resultsFile, resultsLine) && getline(groundTruthFile, groundTruthLine)) {
         if (isFirstLine) {
@@ -134,19 +133,10 @@ float calculateAccuracy(const string& resultsFileName, const string& groundTruth
         auto resultData = parseCSVLine(dsResultsLine);
         auto truthData = parseCSVLine(dsGroundTruthLine);
         
-        if (debugLinesToPrint > 0) {
-            cout << "Parsed resultData fields: " << resultData.size() << endl;
-            cout << "Parsed truthData fields: " << truthData.size() << endl;
-            cout << "Result line content: " << dsResultsLine.c_str() << endl;
-            cout << "Ground truth line content: " << dsGroundTruthLine.c_str() << endl;
-            debugLinesToPrint--;
-        }
-
         if (resultData.size() < 3 || truthData.size() < 2) {
             skippedLines++;
             continue;
         }
-
 
         try {
             if (!resultData[0].empty() && !truthData[0].empty() && 
@@ -158,8 +148,8 @@ float calculateAccuracy(const string& resultsFileName, const string& groundTruth
                 if (predictedSentiment == actualSentiment) {
                     correctPredictions++;
                 } else {
-                    accuracyFile << "Incorrect: " << resultData[1] << " Predicted: " 
-                                 << predictedSentiment << " Actual: " << actualSentiment << endl;
+                    accuracyFile << predictedSentiment << ", " << actualSentiment 
+                                 << ", " << resultData[1] << endl;
                 }
                 totalTweets++;
             } else {
