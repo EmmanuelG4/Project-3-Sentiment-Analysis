@@ -3,20 +3,48 @@
 #include <sstream>
 #include <cctype>
 #include <iomanip>
+#include "csv.hpp"
 #include "Classifier.h"
 
-vector<DSString> parseCSVLine(const DSString& line){
+using namespace std;
+using namespace csv;
+
+vector<DSString> parseCSVLine(const DSString& line) {
     vector<DSString> tokens;
     string lineStr = line.c_str();
-    size_t start = 0;
-    size_t pos = lineStr.find(',');
-
-    while(pos != DSString::npos){
-        tokens.push_back(line.substring(start, pos - start));
-        start = pos + 1;
-        pos = lineStr.find(',', start);
+    
+  
+    if (lineStr.empty()) {
+        return tokens;
     }
-    tokens.push_back(line.substring(start, line.length() - start));
+
+    stringstream ss(lineStr);
+    string token;
+    bool insideQuotes = false;
+    char c;
+
+    while (ss.get(c)) {
+        if (c == '"' && !insideQuotes) {
+            insideQuotes = true; 
+        } else if (c == '"' && insideQuotes) {
+            insideQuotes = false; 
+        } else if (c == ',' && !insideQuotes) {
+  
+            token.erase(0, token.find_first_not_of(" \t"));
+            token.erase(token.find_last_not_of(" \t") + 1);
+
+            tokens.emplace_back(token.c_str());
+            token.clear();
+        } else {
+            token += c;
+        }
+    }
+
+    if (!token.empty()) {
+        token.erase(0, token.find_first_not_of(" \t"));
+        token.erase(token.find_last_not_of(" \t") + 1);
+        tokens.emplace_back(token.c_str());
+    }
 
     return tokens;
 }
@@ -37,30 +65,32 @@ vector<DSString> tokenize(const DSString& text){
     return tokens;
 }
 
-void trainClassifier(const string& filename, map<DSString, SentimentWordCount>& wordSentiments){
-    ifstream file(filename);
-    if(!file.is_open()){
-        cerr << "Error. Could not open " << filename << endl;
-        return;
-    }
+void trainClassifier(const string& filename, map<DSString, SentimentWordCount>& wordSentiments) {
+    CSVReader reader(filename);
+    int lineCount = 0;
 
-    string line;
-    while (getline(file, line)) {
-        DSString dsLine = line.c_str();
-        auto tweetData = parseCSVLine(dsLine);
-        int sentiment = stoi(tweetData[0].c_str());
-        DSString tweetText = tweetData[5];
+    for (CSVRow& row : reader) {
+        lineCount++;
+        if (row.size() < 6) {
+            cerr << "Error: Invalid CSV format in line " << lineCount << endl;
+            continue;
+        }
 
-        for (auto& word : tokenize(tweetText)) {
-            if (sentiment == 4) {
-                wordSentiments[word].positiveCount++;
-            } 
-            else if (sentiment == 0) {
-                wordSentiments[word].negativeCount++;
+        try {
+            int sentiment = row[0].get<int>();
+            DSString tweetText = DSString(row[5].get<>().c_str()).trim();
+
+            for (auto& word : tokenize(tweetText)) {
+                if (sentiment == 4) {
+                    wordSentiments[word].positiveCount++;
+                } else if (sentiment == 0) {
+                    wordSentiments[word].negativeCount++;
+                }
             }
+        } catch (const std::exception& e) {
+            cerr << "Error processing line " << lineCount << ": " << e.what() << endl;
         }
     }
-    file.close();
 }
 
 int classifyTweet(const DSString& tweet, const map<DSString, SentimentWordCount>& wordSentiments){
@@ -76,39 +106,114 @@ int classifyTweet(const DSString& tweet, const map<DSString, SentimentWordCount>
     return positiveScore >= negativeScore ? 4 : 0;
 }
 
-float calculateAccuracy(const string& resultsFileName, const string& groundTruthFilename, const string& accuracyFilename){
+float calculateAccuracy(const string& resultsFileName, const string& groundTruthFilename, const string& accuracyFilename) {
     ifstream resultsFile(resultsFileName);
     ifstream groundTruthFile(groundTruthFilename);
-    ofstream accuracyFile(accuracyFilename);
 
-    if(!resultsFile.is_open() || !groundTruthFile.is_open() || !accuracyFile.is_open()){
-        cerr << "Error. Could not open at least one of the files." << endl; 
+    if (!resultsFile.is_open() || !groundTruthFile.is_open()) {
+        cerr << "Error. Could not open at least one of the files." << endl;
         return 0.0f;
     }
 
     string resultsLine, groundTruthLine;
     int totalTweets = 0, correctPredictions = 0;
+    int skippedLines = 0;
+    bool isFirstLine = true;
 
     while (getline(resultsFile, resultsLine) && getline(groundTruthFile, groundTruthLine)) {
+        if (isFirstLine) {
+            isFirstLine = false;  
+            continue;
+        }
+
         DSString dsResultsLine = resultsLine.c_str();
         DSString dsGroundTruthLine = groundTruthLine.c_str();
 
         auto resultData = parseCSVLine(dsResultsLine);
         auto truthData = parseCSVLine(dsGroundTruthLine);
 
-        int predictedSentiment = stoi(resultData[0].c_str());
-        int actualSentiment = stoi(truthData[0].c_str());
-
-        if (predictedSentiment == actualSentiment) {
-            correctPredictions++;
-        } else {
-            accuracyFile << "Incorrect: " << resultData[1] << " Predicted: " << predictedSentiment << " Actual: " << actualSentiment << endl;
+        if (resultData.size() < 2 || truthData.size() < 1) {
+            skippedLines++;
+            continue;
         }
-        totalTweets++;
+
+        try {
+            int predictedSentiment = stoi(resultData[0].c_str());
+            int actualSentiment = stoi(truthData[0].c_str());
+
+            if (predictedSentiment == actualSentiment) {
+                correctPredictions++;
+            }
+            totalTweets++;
+        } 
+        catch (const invalid_argument& e) {
+            cerr << "Error: Invalid argument in line. Error: " << e.what() << endl;
+            skippedLines++;
+        } 
+        catch (const out_of_range& e) {
+            cerr << "Error: Out of range in line. Error: " << e.what() << endl;
+            skippedLines++;
+        }
     }
 
     float accuracy = (static_cast<float>(correctPredictions) / totalTweets) * 100;
-    accuracyFile << "Accuracy: " << accuracy << "%\n";
+
+    ofstream accuracyFile(accuracyFilename, ios::trunc);  
+    if (!accuracyFile.is_open()) {
+        cerr << "Error. Could not open accuracy file for writing." << endl;
+        return accuracy;
+    }
+    accuracyFile << "Accuracy: " << fixed << setprecision(2) << accuracy << "%\n";
+    accuracyFile.close();
+
+    accuracyFile.open(accuracyFilename, ios::app);  
+    if (!accuracyFile.is_open()) {
+        cerr << "Error. Could not open accuracy file for appending." << endl;
+        return accuracy;
+    }
+
+    resultsFile.clear();
+    resultsFile.seekg(0);
+    groundTruthFile.clear();
+    groundTruthFile.seekg(0);
+    isFirstLine = true;
+
+    while (getline(resultsFile, resultsLine) && getline(groundTruthFile, groundTruthLine)) {
+        if (isFirstLine) {
+            isFirstLine = false;
+            continue;
+        }
+
+        DSString dsResultsLine = resultsLine.c_str();
+        DSString dsGroundTruthLine = groundTruthLine.c_str();
+
+        auto resultData = parseCSVLine(dsResultsLine);
+        auto truthData = parseCSVLine(dsGroundTruthLine);
+
+        if (resultData.size() < 2 || truthData.size() < 1) {
+            continue;
+        }
+
+        try {
+            int predictedSentiment = stoi(resultData[0].c_str());
+            int actualSentiment = stoi(truthData[0].c_str());
+
+            if (predictedSentiment != actualSentiment) {
+                accuracyFile << predictedSentiment << ", " << actualSentiment
+                             << ", " << resultData[1] << endl;
+            }
+        } 
+        catch (const invalid_argument& e) {
+            continue;
+        } 
+        catch (const out_of_range& e) {
+            continue;
+        }
+    }
+
+    if (skippedLines > 0) {
+        cerr << "Skipped " << skippedLines << " lines due to format issues." << endl;
+    }
 
     resultsFile.close();
     groundTruthFile.close();

@@ -29,6 +29,14 @@ class DSString{
 
         ~DSString();
 
+        bool empty() const;  
+
+        DSString trim() const;
+
+        size_t find_first_not_of(char c) const; 
+
+        size_t find_last_not_of(char c) const;
+
         size_t length() const;
 
         char &operator[](size_t);
